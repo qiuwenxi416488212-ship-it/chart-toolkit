@@ -254,6 +254,193 @@ def chart_to_image(data: Union[pd.DataFrame, Dict],
     return chart.save(output_path)
 
 
+# ==================== 增强图表功能 ====================
+
+def plot_heatmap(data, x_col, y_col, title='', cmap='YlOrRd'):
+    """绘制热力图"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    import numpy as np
+    import pandas as pd
+    if isinstance(data, pd.DataFrame):
+        matrix = data.pivot_table(index=y_col, columns=x_col, aggfunc='sum', fill_value=0)
+        plt.figure(figsize=(10, 8))
+        plt.imshow(matrix.values, cmap=cmap, aspect='auto')
+        plt.colorbar()
+        plt.title(title)
+        return plt.gcf()
+    return None
+
+
+def plot_histogram(data, column, bins=30, title=''):
+    """绘制直方图"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    import pandas as pd
+    if isinstance(data, pd.DataFrame):
+        plt.figure(figsize=(10, 6))
+        data[column].hist(bins=bins)
+        plt.title(title)
+        plt.xlabel(column)
+        return plt.gcf()
+    return None
+
+
+def plot_corr_matrix(data, title='Correlation'):
+    """绘制相关性矩阵"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    import pandas as pd
+    if isinstance(data, pd.DataFrame):
+        corr = data.select_dtypes(include=['number']).corr()
+        plt.figure(figsize=(10, 8))
+        plt.imshow(corr.values, cmap='coolwarm', vmin=-1, vmax=1)
+        plt.colorbar()
+        plt.xticks(range(len(corr.columns)), corr.columns, rotation=45)
+        plt.yticks(range(len(corr.columns)), corr.columns)
+        plt.title(title)
+        return plt.gcf()
+    return None
+
+
+def plot_stacked_bar(data, x_col, y_cols, title=''):
+    """绘制堆叠柱状图"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    import pandas as pd
+    if isinstance(data, pd.DataFrame):
+        plt.figure(figsize=(12, 6))
+        data.plot.bar(x=x_col, y=y_cols, stacked=True)
+        plt.title(title)
+        return plt.gcf()
+    return None
+
+
+def plot_timeline(data, x_col, y_cols, title=''):
+    """绘制时间线"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    import pandas as pd
+    if isinstance(data, pd.DataFrame):
+        plt.figure(figsize=(14, 6))
+        for col in y_cols:
+            plt.plot(data[x_col], data[col], marker='o', label=col)
+        plt.title(title)
+        plt.legend()
+        plt.grid(True)
+        return plt.gcf()
+    return None
+
+
+def plot_gauge(value, title='', max_value=100):
+    """绘制仪表盘"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.set_xlim(0, max_value)
+    ax.set_ylim(0, 1)
+    ax.add_patch(plt.Rectangle((0, 0.3), max_value, 0.4, color='lightgray'))
+    ax.add_patch(plt.Rectangle((0, 0.3), value, 0.4, color='green'))
+    plt.title(title)
+    return fig
+
+
+def plot_funnel(data, stage_col, value_col, title=''):
+    """绘制漏斗图"""
+    if not MATPLOTLIB_AVAILABLE:
+        return None
+    import pandas as pd
+    if isinstance(data, pd.DataFrame):
+        fig, ax = plt.subplots(figsize=(10, 6))
+        y_pos = range(len(data))
+        ax.barh(y_pos, data[value_col])
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(data[stage_col])
+        ax.invert_yaxis()
+        plt.title(title)
+        return fig
+    return None
+
+
+def plot_wordcloud(text, output_path=None):
+    """绘制词云"""
+    try:
+        from wordcloud import WordCloud
+    except ImportError:
+        return None
+    wc = WordCloud(width=800, height=400, background_color='white').generate(text)
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wc, interpolation='bilinear')
+    plt.axis('off')
+    if output_path:
+        plt.savefig(output_path)
+    return plt.gcf()
+
+
+def plot_map(data, lat_col, lon_col, title='', output_path=None):
+    """绘制地图"""
+    try:
+        import folium
+    except ImportError:
+        return None
+    m = folium.Map(location=[data[lat_col].mean(), data[lon_col].mean()], zoom_start=10)
+    for _, row in data.iterrows():
+        folium.CircleMarker(location=[row[lat_col], row[lon_col]], radius=5).add_to(m)
+    if output_path:
+        m.save(output_path)
+    return m
+
+
+def batch_charts(data, output_dir='charts'):
+    """批量生成图表"""
+    import os
+    import pandas as pd
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    results = []
+    if isinstance(data, pd.DataFrame):
+        for col in data.select_dtypes(include=['number']).columns[:10]:
+            try:
+                fig = data[col].plot()
+                out_path = os.path.join(output_dir, f'{col}.png')
+                plt.savefig(out_path)
+                results.append(out_path)
+            except:
+                continue
+    return results
+
+
+def dashboard(data, output_path='dashboard.html'):
+    """生成仪表盘"""
+    if not PLOTLY_AVAILABLE:
+        return None
+    import plotly.subplots as tls
+    import plotly.graph_objects as go
+    import pandas as pd
+    if not isinstance(data, pd.DataFrame):
+        return None
+    fig = tls.make_subplots(rows=2, cols=2, subplot_titles=['Line', 'Bar', 'Pie', 'Stats'])
+    numeric_cols = data.select_dtypes(include=['number']).columns
+    if len(numeric_cols) > 0:
+        fig.add_trace(go.Scatter(y=data[numeric_cols[0]], name='Line'), row=1, col=1)
+    fig.update_layout(height=800)
+    fig.write_html(output_path)
+    return output_path
+
+
+COLOR_SCHEMES = {
+    'default': ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'],
+    'pastel': ['#f7bfb6', '#b5e3c4', '#c4b5e3', '#e3c4b5'],
+    'neon': ['#ff00ff', '#00ffff', '#ff00aa', '#aaff00'],
+}
+
+
+def get_color_scheme(name='default'):
+    """获取颜色方案"""
+    return COLOR_SCHEMES.get(name, COLOR_SCHEMES['default'])
+
+
+
 # ============== 测试 ==============
 if __name__ == '__main__':
     print('Data Visualization toolkit loaded')
